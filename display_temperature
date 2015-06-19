@@ -1,0 +1,165 @@
+/***************************************************
+ * This is a library for the Adafruit 1.8" SPI display.
+ * 
+ * This library works with the Adafruit 1.8" TFT Breakout w/SD card
+ * ----> http://www.adafruit.com/products/358
+ * The 1.8" TFT shield
+ * ----> https://www.adafruit.com/product/802
+ * The 1.44" TFT breakout
+ * ----> https://www.adafruit.com/product/2088
+ * as well as Adafruit raw 1.8" TFT display
+ * ----> http://www.adafruit.com/products/618
+ * 
+ * Check out the links above for our tutorials and wiring diagrams
+ * These displays use SPI to communicate, 4 or 5 pins are required to
+ * interface (RST is optional)
+ * Adafruit invests time and resources providing this open source code,
+ * please support Adafruit and open-source hardware by purchasing
+ * products from Adafruit!
+ * 
+ * Written by Limor Fried/Ladyada for Adafruit Industries.
+ * MIT license, all text above must be included in any redistribution
+ ****************************************************/
+
+#include <Adafruit_GFX.h>    // Core graphics library
+#include <Adafruit_ST7735.h> // Hardware-specific library
+#include <SPI.h>
+
+
+// For the breakout, you can use any 2 or 3 pins
+// These pins will also work for the 1.8" TFT shield
+#define TFT_CS     10
+#define TFT_RST    9  // you can also connect this to the Arduino reset
+// in which case, set this #define pin to 0!
+#define TFT_DC     8
+
+// Option 1 (recommended): must use the hardware SPI pins
+// (for UNO thats sclk = 13 and sid = 11) and pin 10 must be
+// an output. This is much faster - also required if you want
+// to use the microSD card (see the image drawing example)
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS,  TFT_DC, TFT_RST);
+
+// Option 2: use any pins but a little slower!
+#define TFT_SCLK 13   // set these to be whatever pins you like!
+#define TFT_MOSI 11   // set these to be whatever pins you like!
+//Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
+
+#define LightGrey       0xC618      /* 192, 192, 192 */
+#define DarkGrey        0x7BEF      /* 128, 128, 128 */
+#define Pink                        0xF81F
+
+// http://stackoverflow.com/questions/13720937/c-defined-16bit-high-color
+
+float p = 3.1415926;
+
+int xCOunter = 0;
+int oldReading;
+
+int startingCalibration = 0;
+
+unsigned long timer = 0;
+
+void setup(void) {
+
+  Serial.begin(9600);
+  Serial.print("Hello! ST7735 TFT Test");
+
+  // Use this initializer if you're using a 1.8" TFT
+  tft.initR(INITR_BLACKTAB);   // initialize a ST7735S chip, black tab
+
+  tft.fillScreen(ST7735_BLACK);
+  uint16_t color1 = ST7735_GREEN;
+  uint16_t color2 = ST7735_WHITE;
+  backGround();
+
+  delay(500);
+  startingCalibration = analogRead(0);
+  Serial.print("starting value= ");
+  Serial.println(startingCalibration, DEC);
+  //855 = 20.1 degrees celsius
+
+}
+
+void backGround(){
+
+  //three color regions: normal, middle, upper
+  uint16_t color1 = LightGrey;//ST7735_GREEN;
+  uint16_t color2 = ST7735_WHITE;//ST7735_CYAN
+
+  tft.fillRect(    0,     0 , tft.width()/3, tft.height() , color1); 
+  tft.fillRect(    tft.width()/3-4,     0 , tft.width()/3 , tft.height(), color2);
+
+  tft.fillRect(  2*  tft.width()/3 - 6,     0 , tft.width(), tft.height() , color1 );  
+
+  uint16_t color = ST7735_BLACK;
+  for (int16_t y=0; y <= tft.height(); y+=20) {
+    for (int16_t x=0; x <= tft.width(); x+=20) {
+      tft.drawLine(x-1, y, x+1, y, color);
+      tft.drawLine(x, y-1, x, y+1, color);
+      tft.drawLine(x, y+10, x+1, y+10, color);
+      tft.drawLine(x+10, y, x+10, y+1, color);
+    }
+  }
+  //red and green line bottom and top side
+  tft.drawLine(0, 0,  0,  tft.height()-1, ST7735_BLUE);
+  tft.drawLine(1, 0,  1,  tft.height()-1, ST7735_BLUE);
+  tft.drawLine( tft.width()-1, 0,  tft.width()-1, tft.height()-1, ST7735_RED);
+  tft.drawLine( tft.width()-2, 0,  tft.width()-2, tft.height()-1, ST7735_RED);
+}
+
+
+void loop() {
+  int reading = 512 + (analogRead(0)-startingCalibration)*10;
+  Serial.print(reading, DEC);
+  if ( reading < 50 ) reading = 50;
+  if ( reading > 1024) reading = 950;
+  Serial.print("   ");
+  Serial.println(reading, DEC);
+
+  tft.setCursor(30, 30);
+  tft.setTextSize(4);
+
+  tft.setTextColor(ST7735_RED);
+
+  uint16_t color =  ST7735_BLACK;
+  tft.drawLine( reading / 9 - 3, xCOunter, reading / 9 , xCOunter, color);
+  uint16_t color2 = ST7735_WHITE;
+  tft.drawLine( reading / 9 , xCOunter-1, reading / 9+2 , xCOunter-1, color2);
+
+  //showing high values
+  if ( reading > 500 )
+    if ( (xCOunter %10) == 0 )
+    {
+      tft.fillCircle(30, xCOunter , 5, color);
+    }
+
+  if ( reading > 600 )
+    if ( (xCOunter %10) == 0 )
+    {
+      tft.fillCircle(20, xCOunter , 5, color);
+    }
+  if ( reading > 700 )
+    if ( (xCOunter %10) == 0 )
+    {
+      tft.fillCircle(10, xCOunter , 5, color);
+    }
+
+  //showing fast rising
+  if ( (reading - oldReading) > 5 )
+    if ( (xCOunter %10) == 0 )
+    {
+      tft.fillCircle(120, xCOunter , 5, ST7735_WHITE);
+    }
+
+  xCOunter++;
+
+  if ( xCOunter > 175 ) {
+    xCOunter = 0;
+    backGround();
+
+  }
+  oldReading = reading;
+  delay(100);
+
+} 
+
